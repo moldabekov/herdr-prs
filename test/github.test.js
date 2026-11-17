@@ -130,3 +130,23 @@ test("classifyFailure: anything else is network with the first stderr line", () 
   assert.deepEqual(classifyFailure({ code: 1, stdout: "", stderr: "\nHTTP 502: Bad Gateway\nmore" }), { kind: "network", message: "HTTP 502: Bad Gateway" });
   assert.deepEqual(classifyFailure({ code: 3, stdout: "", stderr: "" }), { kind: "network", message: "gh exited 3" });
 });
+
+test("outcomeFromExec: JSON stdout is data, even with a nonzero exit", async () => {
+  const { outcomeFromExec } = await import("../mods/gh-prs/github.js");
+  const stdout = JSON.stringify({ data: { viewer: { login: "me" }, repository: null, mine: { issueCount: 0, nodes: [] } }, errors: [{ path: ["repository"], message: "gone" }] });
+  const out = outcomeFromExec({ code: 1, stdout, stderr: "gh: gone" });
+  assert.equal(out.ok, true);
+  assert.equal(out.data.repo.error, "gone");
+});
+
+test("outcomeFromExec: unreadable JSON is a network failure", async () => {
+  const { outcomeFromExec } = await import("../mods/gh-prs/github.js");
+  assert.deepEqual(outcomeFromExec({ code: 0, stdout: '{"errors":[{"message":"API rate limit exceeded"}]}', stderr: "" }),
+    { ok: false, failure: { kind: "network", message: "API rate limit exceeded" } });
+});
+
+test("outcomeFromExec: no JSON goes through classifyFailure", async () => {
+  const { outcomeFromExec } = await import("../mods/gh-prs/github.js");
+  assert.deepEqual(outcomeFromExec({ code: 4, stdout: "", stderr: "please run:  gh auth login" }),
+    { ok: false, failure: { kind: "auth", message: "please run:  gh auth login" } });
+});

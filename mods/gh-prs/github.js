@@ -72,6 +72,17 @@ export function parseResponse(stdout) {
   };
 }
 
+// gh prints the GraphQL body on stdout even when it exits 1 for a partial error
+// (an unknown repo), so JSON on stdout is read first.
+export function outcomeFromExec(result) {
+  if (!String(result?.stdout ?? "").trimStart().startsWith("{")) return { ok: false, failure: classifyFailure(result) };
+  try {
+    return { ok: true, data: parseResponse(result.stdout) };
+  } catch (error) {
+    return { ok: false, failure: { kind: "network", message: error.message } };
+  }
+}
+
 const TIMEOUT = /time(d)?\s?out/i;
 const AUTH = /auth login|not logged in|authentication|HTTP 401/i;
 

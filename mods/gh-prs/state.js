@@ -20,3 +20,34 @@ export function needsRefresh({ shown, inFlight, at, now, contextChanged }) {
   if (!shown || inFlight) return false;
   return contextChanged || at === null || now - at >= INTERVAL_MS;
 }
+
+// The two lists as the view draws them. A folder note (no repo, no remote)
+// explains This repo better than an empty list, so it wins over the API error.
+export function toSections(data, repo, repoNote, collapsed) {
+  if (!data) return null;
+  const list = (s) => ({ total: s?.total ?? 0, items: s?.items ?? [] });
+  return [
+    {
+      kind: "repo", title: "This repo", subtitle: repo ? `${repo.owner}/${repo.name}` : null,
+      ...list(data.repo), note: repoNote ?? data.repo?.error ?? null, collapsed: Boolean(collapsed?.repo),
+    },
+    {
+      kind: "mine", title: "Mine", subtitle: null,
+      ...list(data.mine), note: data.mine?.error ?? null, collapsed: Boolean(collapsed?.mine),
+    },
+  ];
+}
+
+export function parseCollapsed(text) {
+  try {
+    const value = JSON.parse(text);
+    const ok = Boolean(value) && typeof value === "object" && !Array.isArray(value);
+    return { repo: ok && value.repo === true, mine: ok && value.mine === true };
+  } catch {
+    return { repo: false, mine: false };
+  }
+}
+
+export function toggleCollapsed(collapsed, kind) {
+  return { ...collapsed, [kind]: !collapsed[kind] };
+}

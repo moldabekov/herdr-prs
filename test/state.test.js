@@ -54,3 +54,41 @@ test("needsRefresh rules", () => {
   assert.equal(needsRefresh({ ...base, now: 60000 }), true);
   assert.equal(needsRefresh({ ...base, contextChanged: true }), true);
 });
+
+const { toSections, parseCollapsed, toggleCollapsed } = await import("../mods/gh-prs/state.js");
+const prRow = { number: 1, title: "t", url: "u", isDraft: false, review: null, mergeable: "MERGEABLE", ci: null, updatedAt: "", branch: "b", author: "a", repo: "o/r" };
+
+test("toSections: null until data arrives", () => {
+  assert.equal(toSections(null, null, null, {}), null);
+});
+
+test("toSections builds This repo and Mine", () => {
+  const data = { repo: { items: [prRow], total: 3, error: null }, mine: { items: [], total: 0, error: null } };
+  const [repo, mine] = toSections(data, { owner: "o", name: "r" }, null, { repo: false, mine: true });
+  assert.deepEqual(repo, { kind: "repo", title: "This repo", subtitle: "o/r", total: 3, items: [prRow], note: null, collapsed: false });
+  assert.deepEqual(mine, { kind: "mine", title: "Mine", subtitle: null, total: 0, items: [], note: null, collapsed: true });
+});
+
+test("toSections: the folder note wins, then the section's error", () => {
+  const data = { repo: null, mine: { items: [], total: 0, error: "search failed" } };
+  const [repo, mine] = toSections(data, null, "No GitHub remote", {});
+  assert.equal(repo.note, "No GitHub remote");
+  assert.equal(repo.subtitle, null);
+  assert.equal(repo.total, 0);
+  assert.equal(mine.note, "search failed");
+  const [repo2] = toSections({ repo: { items: [], total: 0, error: "Could not resolve" }, mine: data.mine }, { owner: "o", name: "r" }, null, {});
+  assert.equal(repo2.note, "Could not resolve");
+});
+
+test("parseCollapsed tolerates junk", () => {
+  assert.deepEqual(parseCollapsed('{"repo":true}'), { repo: true, mine: false });
+  assert.deepEqual(parseCollapsed("not json"), { repo: false, mine: false });
+  assert.deepEqual(parseCollapsed(null), { repo: false, mine: false });
+  assert.deepEqual(parseCollapsed("[1]"), { repo: false, mine: false });
+});
+
+test("toggleCollapsed returns a new object", () => {
+  const before = Object.freeze({ repo: false, mine: false });
+  assert.deepEqual(toggleCollapsed(before, "mine"), { repo: false, mine: true });
+  assert.deepEqual(before, { repo: false, mine: false });
+});
