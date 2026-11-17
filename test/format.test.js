@@ -65,3 +65,11 @@ test("staleText carries the reason under the old lists", async () => {
   assert.equal(staleText({ stale: true, problem: { kind: "network", message: "HTTP 502" } }), "Couldn't refresh: HTTP 502");
   assert.equal(staleText({ stale: false, problem: null }), null);
 });
+
+test("rowOrigin: where each list's PR comes from", async () => {
+  const { rowOrigin } = await import("../mods/gh-prs/format.js");
+  assert.equal(rowOrigin("repo", pr({ branch: "fix/x", author: "ana" })), "fix/x · @ana");
+  assert.equal(rowOrigin("repo", pr({ branch: "fix/x", author: null })), "fix/x");
+  assert.equal(rowOrigin("review", pr({ repo: "o/r", author: "ana" })), "o/r · @ana");
+  assert.equal(rowOrigin("mine", pr({ repo: "o/r", author: "me" })), "o/r");
+});

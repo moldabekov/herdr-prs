@@ -1,7 +1,7 @@
 // Draws the panel from a plain model. No data fetching here: panel.js owns that.
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex, Scrollbar } from "gpui-base";
-import { relativeTime, ciStatus, badges, problemText } from "./format.js";
+import { relativeTime, ciStatus, badges, problemText, rowOrigin } from "./format.js";
 
 const ICONS = "mods/gh-prs/icons/";
 const LIST_ID = "gh-prs-list";
@@ -25,11 +25,6 @@ function badge(t, b) {
   return div().px(5).rounded(4).border_1().border_color(t[b.color]).text_color(t[b.color]).text_size(10).child(b.label);
 }
 
-// Where the PR comes from; truncates. The age sits apart so a long branch never hides it.
-function origin(kind, pr) {
-  const parts = kind === "repo" ? [pr.branch, pr.author ? `@${pr.author}` : null] : [pr.repo];
-  return parts.filter(Boolean).join(" · ");
-}
 
 function row(t, kind, pr, now, onOpen) {
   const ci = ciStatus(pr.ci);
@@ -40,8 +35,9 @@ function row(t, kind, pr, now, onOpen) {
       .child(div().flex_none().text_size(12).text_color(t.dim).child(`#${pr.number}`))
       .child(div().flex_1().min_w(0).truncate().child(pr.title))
       .children(badges(pr).map((b) => badge(t, b))))
+    // The origin truncates; the age sits apart so a long branch never hides it.
     .child(h_flex().pl(18).gap(8).text_size(11).text_color(t.dim).min_w(0)
-      .child(div().flex_1().min_w(0).truncate().child(origin(kind, pr)))
+      .child(div().flex_1().min_w(0).truncate().child(rowOrigin(kind, pr)))
       .child(div().flex_none().child(relativeTime(pr.updatedAt, now))));
 }
 

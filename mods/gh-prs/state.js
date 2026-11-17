@@ -25,7 +25,7 @@ export function needsRefresh({ shown, inFlight, triedAt, now, contextChanged }) 
   return contextChanged || triedAt === null || now - triedAt >= INTERVAL_MS;
 }
 
-// The two lists as the view draws them. A folder note (no repo, no remote)
+// The three lists as the view draws them, in this order. A folder note (no repo, no remote)
 // explains This repo better than an empty list, so it wins over the API error.
 export function toSections(data, repo, repoNote, collapsed) {
   if (!data) return null;
@@ -34,6 +34,10 @@ export function toSections(data, repo, repoNote, collapsed) {
     {
       kind: "repo", title: "This repo", subtitle: repo ? `${repo.owner}/${repo.name}` : null,
       ...list(data.repo), note: repoNote ?? data.repo?.error ?? null, collapsed: Boolean(collapsed?.repo),
+    },
+    {
+      kind: "review", title: "Review requested", subtitle: null,
+      ...list(data.review), note: data.review?.error ?? null, collapsed: Boolean(collapsed?.review),
     },
     {
       kind: "mine", title: "Mine", subtitle: null,
@@ -46,9 +50,9 @@ export function parseCollapsed(text) {
   try {
     const value = JSON.parse(text);
     const ok = Boolean(value) && typeof value === "object" && !Array.isArray(value);
-    return { repo: ok && value.repo === true, mine: ok && value.mine === true };
+    return { repo: ok && value.repo === true, review: ok && value.review === true, mine: ok && value.mine === true };
   } catch {
-    return { repo: false, mine: false };
+    return { repo: false, review: false, mine: false };
   }
 }
 

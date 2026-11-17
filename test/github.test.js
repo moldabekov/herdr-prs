@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LIMIT, MINE_QUERY, buildQuery, ghArgs, parseResponse, classifyFailure } from "../mods/gh-prs/github.js";
+import { LIMIT, MINE_QUERY, REVIEW_QUERY, buildQuery, ghArgs, parseResponse, classifyFailure } from "../mods/gh-prs/github.js";
 
 // Shape captured from the real API on 2026-11-17.
 const node = (over = {}) => ({
@@ -13,9 +13,17 @@ const node = (over = {}) => ({
 });
 const response = (data, errors) => JSON.stringify(errors ? { data, errors } : { data });
 
-test("limit and the Mine search string are fixed", () => {
+test("limit and the search strings are fixed", () => {
   assert.equal(LIMIT, 30);
   assert.equal(MINE_QUERY, "is:pr is:open author:@me archived:false sort:updated-desc");
+  assert.equal(REVIEW_QUERY, "is:pr is:open review-requested:@me archived:false sort:updated-desc");
+});
+
+test("buildQuery always asks for review requests", () => {
+  for (const withRepo of [true, false]) {
+    assert.match(buildQuery(withRepo), /review:\s*search\(query:\s*\$review/);
+    assert.match(buildQuery(withRepo), /\$review:\s*String!/);
+  }
 });
 
 test("buildQuery includes repository only when asked", () => {
@@ -28,7 +36,7 @@ test("buildQuery includes repository only when asked", () => {
 
 test("buildQuery asks for 30 of each list and the status fields", () => {
   const q = buildQuery(true);
-  assert.equal((q.match(/first:\s*30/g) ?? []).length, 2);
+  assert.equal((q.match(/first:\s*30/g) ?? []).length, 3);
   for (const field of ["reviewDecision", "mergeable", "isDraft", "statusCheckRollup", "headRefName", "nameWithOwner"]) assert.match(q, new RegExp(field));
 });
 
@@ -38,8 +46,9 @@ test("ghArgs passes every value with -f, never -F", () => {
   assert.deepEqual(a.slice(0, 2), ["api", "graphql"]);
   assert.ok(a.includes("owner=1acme") && a.includes("name=123"));
   assert.ok(a.includes(`mine=${MINE_QUERY}`));
+  assert.ok(a.includes(`review=${REVIEW_QUERY}`));
   assert.ok(a.includes(`query=${buildQuery(true)}`));
-  assert.equal(a.filter((s) => s === "-f").length, 4);
+  assert.equal(a.filter((s) => s === "-f").length, 5);
 });
 
 test("ghArgs without a repo sends no owner or name", () => {
@@ -182,4 +191,17 @@ test("isGitHubUrl accepts only https://github.com links", async () => {
   assert.equal(isGitHubUrl("file:///etc/passwd"), false);
   assert.equal(isGitHubUrl("https://github.com/o/r pull"), false);
   assert.equal(isGitHubUrl(undefined), false);
+});
+
+test("parseResponse reads the review-requested list", () => {
+  const out = parseResponse(response({ viewer: { login: "me" }, review: { issueCount: 2, nodes: [node({ number: 5 }), node({ number: 6 })] }, mine: { issueCount: 0, nodes: [] } }));
+  assert.deepEqual(out.review.items.map((p) => p.number), [5, 6]);
+  assert.equal(out.review.total, 2);
+  assert.equal(out.review.error, null);
+});
+
+test("parseResponse puts a review error on review only", () => {
+  const out = parseResponse(response({ viewer: { login: "me" }, review: null, mine: { issueCount: 1, nodes: [node()] } }, [{ path: ["review"], message: "search failed" }]));
+  assert.deepEqual(out.review, { items: [], total: 0, error: "search failed" });
+  assert.equal(out.mine.items.length, 1);
 });

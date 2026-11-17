@@ -58,6 +58,14 @@ export function staleText({ stale, problem }) {
   return stale && problem ? `Couldn't refresh: ${problem.message}` : null;
 }
 
+// Where a row's PR comes from. This repo needs no repo name; a review request
+// is about who asked; your own PRs need only the repo.
+export function rowOrigin(kind, pr) {
+  const author = pr.author ? `@${pr.author}` : null;
+  const parts = kind === "repo" ? [pr.branch, author] : kind === "review" ? [pr.repo, author] : [pr.repo];
+  return parts.filter(Boolean).join(" · ");
+}
+
 export function badges(pr) {
   return [
     REVIEW[pr.review],

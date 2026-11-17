@@ -2,6 +2,8 @@
 
 export const LIMIT = 30;
 export const MINE_QUERY = "is:pr is:open author:@me archived:false sort:updated-desc";
+// Includes requests to a team you are on; GitHub drops you once you have reviewed.
+export const REVIEW_QUERY = "is:pr is:open review-requested:@me archived:false sort:updated-desc";
 
 const FRAGMENT = `fragment pr on PullRequest {
   number title url isDraft reviewDecision mergeable updatedAt headRefName
@@ -18,10 +20,11 @@ const REPOSITORY = `repository(owner: $owner, name: $name) {
   }`;
 
 export function buildQuery(withRepo) {
-  const vars = withRepo ? "$mine: String!, $owner: String!, $name: String!" : "$mine: String!";
+  const vars = withRepo ? "$mine: String!, $review: String!, $owner: String!, $name: String!" : "$mine: String!, $review: String!";
   return `query(${vars}) {
   viewer { login }
   ${withRepo ? REPOSITORY : ""}
+  review: search(query: $review, type: ISSUE, first: ${LIMIT}) { issueCount nodes { ...pr } }
   mine: search(query: $mine, type: ISSUE, first: ${LIMIT}) { issueCount nodes { ...pr } }
 }
 ${FRAGMENT}`;
@@ -29,7 +32,7 @@ ${FRAGMENT}`;
 
 // -f sends every value as a string; -F would turn a repo named "123" into a number.
 export function ghArgs(repo) {
-  const base = ["api", "graphql", "-f", `query=${buildQuery(Boolean(repo))}`, "-f", `mine=${MINE_QUERY}`];
+  const base = ["api", "graphql", "-f", `query=${buildQuery(Boolean(repo))}`, "-f", `mine=${MINE_QUERY}`, "-f", `review=${REVIEW_QUERY}`];
   return repo ? [...base, "-f", `owner=${repo.owner}`, "-f", `name=${repo.name}`] : base;
 }
 
@@ -71,6 +74,7 @@ export function parseResponse(stdout) {
   const prs = data.repository?.pullRequests;
   return {
     repo: asked ? section(prs?.nodes, prs?.totalCount, repoError) : null,
+    review: section(data.review?.nodes, data.review?.issueCount, errorFor(errors, "review", data.review)),
     mine: section(data.mine?.nodes, data.mine?.issueCount, errorFor(errors, "mine", data.mine)),
   };
 }

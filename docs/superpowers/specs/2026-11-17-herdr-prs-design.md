@@ -381,3 +381,20 @@ To regenerate after a Herdr update, run `install.sh` again.
     configurable time;
   - uninstall removes `data/gh-prs/`;
   - the README's pending colour is described correctly.
+
+## Review requested list (2026-11-17)
+
+- **Order.** The panel shows three lists: This repo, Review requested,
+  Mine.
+- **Query.** Review requested is
+  `is:pr is:open review-requested:@me archived:false sort:updated-desc`.
+  - It includes requests to a team the person is on.
+  - GitHub drops the person from the requested reviewers once they have
+    reviewed, so a PR leaves the list then.
+- **Fetching.** It rides in the same single GraphQL call, as a third
+  `search` aliased `review`, with the same 30-PR limit and the same
+  per-list errors.
+- **Rows.** The second line is `repo · @author · age`: for a review, who
+  asked matters.
+- **Collapse state.** Collapsing is remembered per list, as before, now
+  including `review`.

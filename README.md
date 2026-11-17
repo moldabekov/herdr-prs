@@ -3,11 +3,14 @@
 A **Pull requests** panel for the [Herdr](https://herdr.dev) app. It sits
 beside the Files and Changes panels and has a **PRs** button in the tab bar.
 
-It shows two lists:
+It shows three lists:
 
 - **This repo**: the open PRs of the repo your focused terminal is in. It
   follows focus the way the Changes panel does, including spaces on remote
   machines.
+- **Review requested**: open PRs waiting for your review, including
+  requests to a team you're on. A PR leaves the list once you've reviewed
+  it.
 - **Mine**: your own open PRs across GitHub.
 
 Each row shows:
@@ -17,8 +20,9 @@ Each row shows:
   colour for pending, a dim dot when the PR has no checks;
 - a review badge (Approved, Changes or Review), plus Draft and Conflict
   badges;
-- the branch and author (This repo) or the repo (Mine), and how long ago
-  it was updated.
+- where it comes from: the branch and author (This repo), the repo and
+  author (Review requested), or the repo (Mine); and how long ago it was
+  updated.
 
 Click a row to open the PR in your browser.
 

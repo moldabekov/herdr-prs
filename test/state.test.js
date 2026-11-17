@@ -97,15 +97,19 @@ test("toSections: null until data arrives", () => {
 });
 
 test("toSections builds This repo and Mine", () => {
-  const data = { repo: { items: [prRow], total: 3, error: null }, mine: { items: [], total: 0, error: null } };
-  const [repo, mine] = toSections(data, { owner: "o", name: "r" }, null, { repo: false, mine: true });
+  const data = { repo: { items: [prRow], total: 3, error: null }, review: { items: [prRow], total: 1, error: null }, mine: { items: [], total: 0, error: null } };
+  const sections = toSections(data, { owner: "o", name: "r" }, null, { repo: false, review: true, mine: true });
+  assert.deepEqual(sections.map((s) => s.kind), ["repo", "review", "mine"]);
+  const [repo, review, mine] = sections;
   assert.deepEqual(repo, { kind: "repo", title: "This repo", subtitle: "o/r", total: 3, items: [prRow], note: null, collapsed: false });
+  assert.deepEqual(review, { kind: "review", title: "Review requested", subtitle: null, total: 1, items: [prRow], note: null, collapsed: true });
   assert.deepEqual(mine, { kind: "mine", title: "Mine", subtitle: null, total: 0, items: [], note: null, collapsed: true });
 });
 
 test("toSections: the folder note wins, then the section's error", () => {
   const data = { repo: null, mine: { items: [], total: 0, error: "search failed" } };
-  const [repo, mine] = toSections(data, null, "No GitHub remote", {});
+  const [repo, review, mine] = toSections(data, null, "No GitHub remote", {});
+  assert.deepEqual(review, { kind: "review", title: "Review requested", subtitle: null, total: 0, items: [], note: null, collapsed: false });
   assert.equal(repo.note, "No GitHub remote");
   assert.equal(repo.subtitle, null);
   assert.equal(repo.total, 0);
@@ -115,10 +119,10 @@ test("toSections: the folder note wins, then the section's error", () => {
 });
 
 test("parseCollapsed tolerates junk", () => {
-  assert.deepEqual(parseCollapsed('{"repo":true}'), { repo: true, mine: false });
-  assert.deepEqual(parseCollapsed("not json"), { repo: false, mine: false });
-  assert.deepEqual(parseCollapsed(null), { repo: false, mine: false });
-  assert.deepEqual(parseCollapsed("[1]"), { repo: false, mine: false });
+  assert.deepEqual(parseCollapsed('{"repo":true,"review":true}'), { repo: true, review: true, mine: false });
+  assert.deepEqual(parseCollapsed("not json"), { repo: false, review: false, mine: false });
+  assert.deepEqual(parseCollapsed(null), { repo: false, review: false, mine: false });
+  assert.deepEqual(parseCollapsed("[1]"), { repo: false, review: false, mine: false });
 });
 
 test("toggleCollapsed returns a new object", () => {
