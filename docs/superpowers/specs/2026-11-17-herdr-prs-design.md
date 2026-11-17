@@ -356,3 +356,28 @@ To regenerate after a Herdr update, run `install.sh` again.
 - Exact pixel sizes: the button block width, row heights, and icon art.
   Tune them with `herdr-app shot`.
 - The README wording.
+
+## Changes after the build (2026-11-17)
+
+- **The PRs panel is global, not per space.** This is the owner's request,
+  and it replaces the "no per-space memory" decision above.
+  - The PRs button keeps one open/closed state in its own storage
+    (`localStorage`, under `data/gh-prs/`). Still no shared state.
+  - For 1.5 s after a space switch, a closed PRs panel is the stock tab
+    bar's per-space restore, and the button reopens it.
+  - Outside that window, a change is the person's, and it becomes the
+    global state: a click, picking Files or Changes, or closing the panel.
+  - While PRs is open, it wins over a space's remembered Files or Changes.
+  - The panel may blink for a frame on a switch.
+- **The review's deferred minors are fixed:**
+  - same-repo folder changes skip the GitHub call;
+  - only `https://github.com` links are opened;
+  - unexpected refresh errors are shown and paced;
+  - `make-layout.mjs` checks every node it relies on;
+  - install checks first and writes its marker before copying;
+  - install reports when Herdr isn't running, and undoes a failed first
+    install;
+  - install keeps Herdr's `layout.error` and waits a bounded,
+    configurable time;
+  - uninstall removes `data/gh-prs/`;
+  - the README's pending colour is described correctly.

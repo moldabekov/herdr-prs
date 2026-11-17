@@ -13,7 +13,8 @@ It shows two lists:
 Each row shows:
 
 - the PR number and title;
-- the CI status: ✓ passing, ✕ failing, an amber dot for pending;
+- the CI status: ✓ passing, ✕ failing, a dot in your theme's "working"
+  colour for pending, a dim dot when the PR has no checks;
 - a review badge (Approved, Changes or Review), plus Draft and Conflict
   badges;
 - the branch and author (This repo) or the repo (Mine), and how long ago
@@ -22,7 +23,15 @@ Each row shows:
 Click a row to open the PR in your browser.
 
 The panel refreshes every minute while it is open, and never while it is
-closed.
+closed. Moving to another folder of the same repo doesn't call GitHub
+again; the refresh button always does.
+
+**Open or closed is global.** Open PRs once and it stays open as you move
+between spaces, until you close it or pick Files or Changes in the tab bar.
+While PRs is open it takes the side panel in every space, so a space's
+remembered Files or Changes panel doesn't come back. On a space switch the
+panel can blink for a frame: the stock tab bar closes it, and the PRs
+button opens it again.
 
 ## Requirements
 
@@ -39,10 +48,16 @@ bash scripts/install.sh
 
 This script:
 
+- checks the mod (`herdr-app check`) before it changes anything;
 - copies `mods/gh-prs` into `~/.config/herdr-app/mods/`;
 - creates the `main-prs` layout from Herdr's `main` layout;
-- checks the mod;
-- switches to the new layout.
+- waits up to 2 seconds for Herdr to reject the layout
+  (`HERDR_PRS_SETTLE_SECONDS` changes the wait);
+- switches to the new layout. If Herdr isn't running, it says so; pick
+  `main-prs` with `ctrl-shift-l` when you open Herdr.
+
+If a first install fails after creating the layout, the script removes the
+unfinished layout and switches back to `main`.
 
 `ctrl-shift-l` cycles layouts, so you can get back to `main` at any time.
 
@@ -63,8 +78,8 @@ bash scripts/uninstall.sh
 This script:
 
 - switches to `main`;
-- removes the copied mod. It only removes a folder that `install.sh`
-  marked as its own.
+- removes the copied mod, and the panel's saved state in `data/gh-prs/`.
+  It only removes a mod folder that `install.sh` marked as its own.
 - moves `layouts/main-prs.json` aside as `main-prs.json.removed-<time>`.
 
 ## What it never touches
@@ -76,16 +91,16 @@ updates.
   sidebar mods all stay Herdr's.
 - `keys.json` and `settings.json` are never written, so there is no
   keyboard shortcut.
-- No shared state is written. Because of this, the PRs panel is not
-  remembered per space: leave a space and come back, and it is closed.
-  Files and Changes still remember as before.
+- No shared state is written. The PRs button keeps "open or closed" in its
+  own storage, and Files and Changes still remember per space as before.
 - Install adds `layouts/main-prs.json` and `mods/gh-prs/`. Herdr then
   writes two files of its own for them:
   - `layouts/.state/main-prs.json`: the layout's clicks, copied from
     `main`;
-  - `data/gh-prs/`: which sections you collapsed.
+  - `data/gh-prs/`: whether PRs is open, and which sections you collapsed.
 
-  Uninstall leaves these two files. They are harmless, and Herdr owns them.
+  Uninstall removes `data/gh-prs/`. It leaves `layouts/.state/main-prs.json`,
+  which is Herdr's own file and harmless.
 
 ## Limits
 
@@ -102,10 +117,14 @@ npm run coverage    # with an 80% line threshold
 ```
 
 - **Pure modules** (`repo.js`, `github.js`, `format.js`, `state.js`,
-  `layout-state.js`, `scripts/make-layout.mjs`) hold all the logic, and the
-  tests cover them.
-- **Views** (`main.js`, `button.js`, `panel.js`, `panel-view.js`) are
-  checked with `herdr-app check` and in the running app with
-  `herdr-app shot`.
+  `memory.js`, `layout-state.js`, `scripts/make-layout.mjs`) hold the
+  logic, and unit tests cover them.
+- **`panel.js` and `button.js`** are driven by tests through a stand-in
+  host: `test/support/host-loader.mjs` points their `herdr` and `gpui-*`
+  imports at small fakes.
+- **The install scripts** run in tests against a throwaway Herdr home,
+  with a stand-in `herdr-app`.
+- **The drawing** (`panel-view.js`, `main.js`) is checked with
+  `herdr-app check` and in the running app with `herdr-app shot`.
 
 The design and the plan are in `docs/superpowers/`.
