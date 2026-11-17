@@ -1,0 +1,5 @@
+# Written by Herdr into every mod folder on start
+mods/gh-prs/jsconfig.json
+mods/gh-prs/*.d.ts
+coverage/
+.superpowers/
