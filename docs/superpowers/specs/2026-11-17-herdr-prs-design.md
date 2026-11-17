@@ -1,6 +1,6 @@
 # herdr-prs: a Pull requests panel for the Herdr app
 
-Date: 2026-11-17 · Status: draft, awaiting approval
+Date: 2026-11-17 · Status: approved after the spec review (decisions at the end)
 
 ## Intent
 
@@ -23,8 +23,6 @@ receiving Herdr's automatic updates.
 
 - A **PRs** button in the tab bar. It opens and closes the panel the same
   way the Files and Changes buttons do.
-- Each space remembers whether its panel is open, the same way Files and
-  Changes are remembered.
 - Each PR row shows:
   - number and title
   - CI rollup: passing, failing, pending, or no checks
@@ -50,6 +48,12 @@ These are not built now. Any of them can come later.
 - Placing the button correctly on Linux and Windows. There the tab bar draws
   window buttons last, so PRs would sit to their right. macOS is the target.
 - herdr.dev sharing (`RECIPE.md`, `preview.png`).
+- **Per-space memory for PRs.** Files and Changes still remember per space.
+  The PRs panel closes when you leave a space and come back. The owner
+  chose this in the review.
+- **More than one GitHub account.** Mine uses only the active `gh` account
+  (whichever account `gh` is set to). The owner chose this in the review.
+- A Settings preview picture for `main-prs`. It shows a plain frame there.
 
 ## Anti-goals
 
@@ -58,6 +62,8 @@ Any of these makes the change a failure even if the panel works.
 - Cloning or editing any shipped mod: `tabs`, `files`, `changes`,
   `workspace-*`, sidebar mods.
 - Editing `keys.json` or `settings.json`.
+- Writing any shared state another mod reads. In particular, never add
+  `gh-prs` to `shared("workspace.panels")`.
 - Calling the GitHub API while the panel is hidden.
 - Redrawing on a timer to animate. Herdr's native animation is used instead.
 
@@ -72,10 +78,15 @@ Any of these makes the change a failure even if the panel works.
   - `layout.select {stack:"panel-body", child}`
   - `layout.show {id:"panel"}`
   - `layout.hide {id:"panel"}` closes it.
-- **Per-space memory.** `tabs` remembers each space's open panel, but it
-  only restores ids listed in `shared("workspace.panels")` (default
-  `["files","changes"]`). The welcome screen writes that list, and it keeps
-  ids it doesn't know about (`frame/welcome/main.js:110-118`).
+- **Per-space memory.** `tabs` remembers each space's open panel.
+  - It keeps one store for every layout, `data/tabs/store.json` (`panels`),
+    so its copy in `main` and its copy in `main-prs` share it.
+  - It records whatever `panel-body.active` is, including `gh-prs`.
+  - It only restores ids listed in `shared("workspace.panels")` (default
+    `["files","changes"]`, `mods/tabs/main.js:66-79`).
+  - A stored id that isn't listed restores as closed. That is why PRs
+    closes on a space switch, and why a leftover `gh-prs` entry is
+    harmless in `main`: it just closes the panel.
 - **Shipped layouts are read-only.**
   - Changing the layout needs a clone. `layout.clone` copies the clicks
     stored in `layouts/.state/main.json` and records `cloned_from`.
@@ -164,10 +175,8 @@ Re-running it after a Herdr update re-derives `main-prs` from the new
   "gh-prs"`.
 - **Click.** Clicking toggles the panel with the same three commands.
   The press stops propagation so it doesn't drag the window.
-- **Init.** In `init`, if `"gh-prs"` is missing from `workspace.panels`
-  (default `["files","changes"]`), the button appends it with `setShared`.
-  It does this in init only, never during render. The button does nothing
-  during `checking()`.
+- **Shared state.** The button writes no shared state. Per-space restore is
+  left to `tabs`, which restores PRs as closed (see Constraints).
 
 ### Panel
 
@@ -285,7 +294,9 @@ blank:
 5. It runs `herdr-app do layout.switch '{"name":"main-prs"}'`.
 
 `uninstall.sh` switches to `main`, removes the symlink, and moves
-`main-prs.json` aside as `main-prs.json.removed-<time>`.
+`main-prs.json` aside as `main-prs.json.removed-<time>`. It has no shared
+state to clean up. Any `gh-prs` entries left in `tabs`'s store restore as a
+closed panel.
 
 To regenerate after a Herdr update, run `install.sh` again.
 
@@ -304,8 +315,12 @@ To regenerate after a Herdr update, run `install.sh` again.
   - after install, `herdr-app status` shows `main-prs` with no errors;
   - `herdr-app shot` shows the PRs button and the open panel with both
     lists;
-  - switching spaces restores each space's panel;
-  - the Files and Changes buttons still work.
+  - Files and Changes still restore per space;
+  - a space that last had PRs open comes back with the panel closed, and
+    shows no error toast;
+  - switching to stock `main` shows no error and no panel popping open;
+  - the Files and Changes buttons still work;
+  - `shared.json` never gains `gh-prs`.
 
 ## Risks, verified first in the plan
 
@@ -314,9 +329,27 @@ To regenerate after a Herdr update, run `install.sh` again.
    `--link` flag for development.
 2. **`author:@me` in GraphQL search.** If GitHub doesn't accept it, the
    panel fetches `viewer.login` first.
-3. **Per-space restore with `gh-prs` in `workspace.panels`.** `tabs` should
-   accept it, because it checks `enabled.includes(stored)`, but this needs
-   checking in the app.
+3. **Restoring a space whose stored panel is `gh-prs`.** In both layouts,
+   `tabs` should close the panel quietly, because `want` is null and only
+   `layout.hide` runs. This needs confirming in the app.
+
+## Decisions from the spec review (2026-11-17)
+
+- **The reviewer's finding.** Adding `gh-prs` to `workspace.panels` would
+  leak into stock `main`, because `tabs` keeps one store for every layout.
+  `main` would run `layout.select` on a child it doesn't have and open the
+  panel on Files. Uninstall couldn't clean that up while the app runs.
+  **Owner's decision:** no per-space memory for PRs, and shared state stays
+  untouched.
+- **Accounts.** `gh` has a second github.com account whose token is
+  invalid. **Owner's decision:** Mine covers the active account only.
+- **Checked and clean, no change needed:**
+  - Every repo under `~/src` uses a `git@github.com:` or
+    `https://github.com/` remote. The GitLab repos get the "not on GitHub"
+    line.
+  - Forks use `origin` for the parent, so "upstream, else origin" picks the
+    parent.
+  - Nothing depends on the layout being named `main`.
 
 ## Left to the builder
 
