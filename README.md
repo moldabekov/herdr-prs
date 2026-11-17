@@ -137,3 +137,7 @@ npm run coverage    # with an 80% line threshold
 
 The design and the plan are in `docs/superpowers/`. `RECIPE.md` is the
 brief to build this mod from scratch, in the format herdr.dev uses.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

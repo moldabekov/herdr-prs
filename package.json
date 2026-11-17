@@ -2,6 +2,7 @@
   "name": "herdr-prs",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "test": "node --test 'test/*.test.js'",
     "coverage": "node --test --experimental-test-coverage --test-coverage-include='mods/gh-prs/*.js' --test-coverage-include='scripts/*.mjs' --test-coverage-lines=80 'test/*.test.js'"
