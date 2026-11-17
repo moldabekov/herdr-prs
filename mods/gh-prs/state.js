@@ -3,22 +3,26 @@
 
 export const INTERVAL_MS = 60000;
 
+// data: the lists; source: {repo, note} of the folder those lists describe;
+// at: when data last arrived (the "updated" label); triedAt: the last attempt,
+// success or not, which paces the next one.
 export function initialState() {
-  return { data: null, at: null, problem: null, stale: false };
+  return { data: null, source: null, at: null, triedAt: null, problem: null, stale: false };
 }
 
-// A network hiccup keeps the last lists on screen; a missing gh or a logged-out
-// gh means there is nothing trustworthy left to show.
+// A network hiccup keeps the last lists, and the label they belong to, on
+// screen; a missing gh or a logged-out gh leaves nothing trustworthy to show.
 export function applyFetch(prev, outcome, now) {
-  if (outcome.ok) return { data: outcome.data, at: now, problem: null, stale: false };
+  if (outcome.ok) return { data: outcome.data, source: outcome.source ?? null, at: now, triedAt: now, problem: null, stale: false };
   const problem = { ...outcome.failure };
-  if (problem.kind === "network") return { ...prev, problem, stale: true };
-  return { data: null, at: now, problem, stale: false };
+  if (problem.kind === "network") return { ...prev, triedAt: now, problem, stale: true };
+  return { data: null, source: null, at: now, triedAt: now, problem, stale: false };
 }
 
-export function needsRefresh({ shown, inFlight, at, now, contextChanged }) {
+// Paced from the last attempt, so a failure waits a full interval like a success.
+export function needsRefresh({ shown, inFlight, triedAt, now, contextChanged }) {
   if (!shown || inFlight) return false;
-  return contextChanged || at === null || now - at >= INTERVAL_MS;
+  return contextChanged || triedAt === null || now - triedAt >= INTERVAL_MS;
 }
 
 // The two lists as the view draws them. A folder note (no repo, no remote)

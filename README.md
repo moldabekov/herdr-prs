@@ -79,7 +79,13 @@ updates.
 - No shared state is written. Because of this, the PRs panel is not
   remembered per space: leave a space and come back, and it is closed.
   Files and Changes still remember as before.
-- The only new things are `layouts/main-prs.json` and `mods/gh-prs/`.
+- Install adds `layouts/main-prs.json` and `mods/gh-prs/`. Herdr then
+  writes two files of its own for them:
+  - `layouts/.state/main-prs.json`: the layout's clicks, copied from
+    `main`;
+  - `data/gh-prs/`: which sections you collapsed.
+
+  Uninstall leaves these two files. They are harmless, and Herdr owns them.
 
 ## Limits
 

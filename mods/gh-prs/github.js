@@ -54,31 +54,36 @@ function section(nodes, total, error) {
   return { items: (nodes ?? []).filter((n) => n && typeof n.number === "number").map(toRow), total: total ?? 0, error: null };
 }
 
-function errorFor(errors, key) {
+// An error only stands for a whole section when that section came back empty;
+// one inaccessible PR (a SAML org) arrives as a null node beside the others.
+function errorFor(errors, key, value) {
+  if (value) return null;
   return errors.find((e) => e?.path?.[0] === key)?.message ?? null;
 }
 
 export function parseResponse(stdout) {
   const body = JSON.parse(stdout);
   const errors = Array.isArray(body.errors) ? body.errors : [];
-  if (!body.data) throw new Error(errors[0]?.message ?? "GitHub returned no data");
+  if (!body.data) throw new Error(errors[0]?.message ?? body.message ?? "GitHub returned no data");
   const { data } = body;
-  const repoError = errorFor(errors, "repository");
+  const repoError = errorFor(errors, "repository", data.repository);
   const asked = "repository" in data || repoError !== null;
   const prs = data.repository?.pullRequests;
   return {
     repo: asked ? section(prs?.nodes, prs?.totalCount, repoError) : null,
-    mine: section(data.mine?.nodes, data.mine?.issueCount, errorFor(errors, "mine")),
+    mine: section(data.mine?.nodes, data.mine?.issueCount, errorFor(errors, "mine", data.mine)),
   };
 }
 
 // gh prints the GraphQL body on stdout even when it exits 1 for a partial error
-// (an unknown repo), so JSON on stdout is read first.
+// (an unknown repo), so JSON on stdout is read first. JSON without data on a
+// failed exit (a 401 body) is gh's error: classify it from stderr.
 export function outcomeFromExec(result) {
   if (!String(result?.stdout ?? "").trimStart().startsWith("{")) return { ok: false, failure: classifyFailure(result) };
   try {
     return { ok: true, data: parseResponse(result.stdout) };
   } catch (error) {
+    if (result.code !== 0) return { ok: false, failure: classifyFailure(result) };
     return { ok: false, failure: { kind: "network", message: error.message } };
   }
 }

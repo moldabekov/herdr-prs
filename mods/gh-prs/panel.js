@@ -4,10 +4,13 @@ import { spaces, panes, focused, exec, layout, theme, checking } from "herdr";
 import { isPanelShown } from "./layout-state.js";
 import { resolveRepo } from "./repo.js";
 import { ghArgs, outcomeFromExec, classifyFailure } from "./github.js";
-import { INTERVAL_MS, initialState, applyFetch, needsRefresh, toSections, parseCollapsed, toggleCollapsed } from "./state.js";
+import { initialState, applyFetch, needsRefresh, toSections, parseCollapsed, toggleCollapsed } from "./state.js";
+import { staleText } from "./format.js";
 import { renderPanel } from "./panel-view.js";
 
 const GH_TIMEOUT_MS = 20000;
+// How often to ask needsRefresh; it alone decides, so a fetch is 60–75 s apart.
+const TICK_MS = 15000;
 const COLLAPSED_KEY = "collapsed";
 
 // Same as the shipped Changes panel: the focused pane's folder and machine.
@@ -36,11 +39,13 @@ export class PanelView {
     this.state = initialState();
     this.inFlight = false;
     this.context = undefined;
-    this.repo = null;
-    this.repoNote = null;
     this.note = null;
     this.collapsed = readCollapsed();
-    cx.timer.every(INTERVAL_MS, (cx) => { if (isPanelShown(layout())) this.refresh(cx); });
+    cx.timer.every(TICK_MS, (cx) => { if (this.due(Date.now())) this.refresh(cx); });
+  }
+
+  due(now) {
+    return needsRefresh({ shown: isPanelShown(layout()), inFlight: this.inFlight, triedAt: this.state.triedAt, now, contextChanged: key() !== this.context });
   }
 
   refresh(cx) {
@@ -54,9 +59,7 @@ export class PanelView {
         const outcome = await fetchPrs(resolved.repo);
         // Focus moved to another folder meanwhile: drop it; render asks again.
         if (key() !== context) return;
-        this.state = applyFetch(this.state, outcome, Date.now());
-        this.repo = resolved.repo;
-        this.repoNote = resolved.note;
+        this.state = applyFetch(this.state, { ...outcome, source: resolved }, Date.now());
       } finally {
         this.inFlight = false;
         cx.notify();
@@ -85,12 +88,11 @@ export class PanelView {
 
   render(cx) {
     const now = Date.now();
-    const shown = isPanelShown(layout());
-    if (needsRefresh({ shown, inFlight: this.inFlight, at: this.state.at, now, contextChanged: key() !== this.context })) this.refresh(cx);
-    const { data, at, stale, problem } = this.state;
+    if (this.due(now)) this.refresh(cx);
+    const { data, source, at, stale, problem } = this.state;
     return renderPanel(theme(), {
-      now, at, stale, problem, inFlight: this.inFlight, note: this.note,
-      sections: toSections(data, this.repo, this.repoNote, this.collapsed),
+      now, at, stale, problem, inFlight: this.inFlight, note: this.note ?? staleText(this.state),
+      sections: toSections(data, source?.repo ?? null, source?.note ?? null, this.collapsed),
     }, {
       onRefresh: (cx) => { this.refresh(cx); cx.notify(); },
       onOpen: (url, cx) => this.open(url, cx),

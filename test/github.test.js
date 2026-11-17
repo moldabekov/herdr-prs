@@ -150,3 +150,26 @@ test("outcomeFromExec: no JSON goes through classifyFailure", async () => {
   assert.deepEqual(outcomeFromExec({ code: 4, stdout: "", stderr: "please run:  gh auth login" }),
     { ok: false, failure: { kind: "auth", message: "please run:  gh auth login" } });
 });
+
+// Review Important #2: a revoked token answers 401 with a JSON body on stdout.
+test("outcomeFromExec: a 401 JSON body with a nonzero exit is auth", async () => {
+  const { outcomeFromExec } = await import("../mods/gh-prs/github.js");
+  const out = outcomeFromExec({ code: 1, stdout: '{"message":"Bad credentials","documentation_url":"https://docs.github.com/rest","status":"401"}', stderr: "gh: Bad credentials (HTTP 401)" });
+  assert.equal(out.ok, false);
+  assert.equal(out.failure.kind, "auth");
+});
+
+test("parseResponse uses a REST-style message when there is no data", () => {
+  assert.throws(() => parseResponse('{"message":"Bad credentials","status":"401"}'), /Bad credentials/);
+});
+
+// Review: one inaccessible PR (a SAML org) must not blank the whole list.
+test("parseResponse keeps a section whose data came back next to a nested error", () => {
+  const out = parseResponse(response(
+    { viewer: { login: "me" }, mine: { issueCount: 4, nodes: [node({ number: 1 }), node({ number: 2 }), node({ number: 3 }), null] } },
+    [{ path: ["mine", "nodes", 3], message: "Resource protected by organization SAML enforcement." }],
+  ));
+  assert.equal(out.mine.error, null);
+  assert.deepEqual(out.mine.items.map((p) => p.number), [1, 2, 3]);
+  assert.equal(out.mine.total, 4);
+});

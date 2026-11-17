@@ -1,14 +1,10 @@
 // Draws the panel from a plain model. No data fetching here: panel.js owns that.
 import { div, svg } from "gpui-kit";
 import { h_flex, v_flex, Scrollbar } from "gpui-base";
-import { relativeTime, ciStatus, badges } from "./format.js";
+import { relativeTime, ciStatus, badges, problemText } from "./format.js";
 
 const ICONS = "mods/gh-prs/icons/";
 const LIST_ID = "gh-prs-list";
-const PROBLEM_COPY = {
-  "missing-gh": "Install the GitHub CLI (gh) to see pull requests",
-  auth: "Run `gh auth login` in a terminal",
-};
 
 function header(t, m, onRefresh) {
   const status = m.stale
@@ -75,7 +71,8 @@ function section(t, s, now, handlers) {
 
 function body(t, m, handlers) {
   const center = (text) => div().p(18).text_color(t.dim).child(text);
-  if (m.problem && PROBLEM_COPY[m.problem.kind]) return center(PROBLEM_COPY[m.problem.kind]);
+  const problem = problemText(m.problem, Boolean(m.sections));
+  if (problem) return center(problem);
   if (!m.sections) return center("Loading…");
   return div().flex_1().min_h(0).relative()
     .child(v_flex().id(LIST_ID).absolute().inset_0().overflow_y_scroll().p(6).gap(8)

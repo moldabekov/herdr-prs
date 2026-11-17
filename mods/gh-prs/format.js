@@ -40,6 +40,24 @@ const REVIEW = {
   REVIEW_REQUIRED: { label: "Review", color: "muted" },
 };
 
+const PROBLEM_COPY = {
+  "missing-gh": "Install the GitHub CLI (gh) to see pull requests",
+  auth: "Run `gh auth login` in a terminal",
+};
+
+// What replaces the lists. A network problem only does when there are no old
+// lists to keep showing.
+export function problemText(problem, hasSections) {
+  if (!problem) return null;
+  if (PROBLEM_COPY[problem.kind]) return PROBLEM_COPY[problem.kind];
+  return hasSections ? null : `Couldn't load pull requests: ${problem.message}`;
+}
+
+// Why the lists on screen are old.
+export function staleText({ stale, problem }) {
+  return stale && problem ? `Couldn't refresh: ${problem.message}` : null;
+}
+
 export function badges(pr) {
   return [
     REVIEW[pr.review],

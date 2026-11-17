@@ -49,3 +49,19 @@ test("badges: nothing for a plain or UNKNOWN-mergeable PR", () => {
   assert.deepEqual(badges(pr()), []);
   assert.deepEqual(badges(pr({ mergeable: "UNKNOWN" })), []);
 });
+
+// Review Important #3: a failed first load must say why, not "Loading…" forever.
+test("problemText says what is wrong", async () => {
+  const { problemText } = await import("../mods/gh-prs/format.js");
+  assert.equal(problemText(null, false), null);
+  assert.equal(problemText({ kind: "missing-gh", message: "ENOENT" }, true), "Install the GitHub CLI (gh) to see pull requests");
+  assert.equal(problemText({ kind: "auth", message: "401" }, false), "Run `gh auth login` in a terminal");
+  assert.equal(problemText({ kind: "network", message: "API rate limit exceeded" }, false), "Couldn't load pull requests: API rate limit exceeded");
+  assert.equal(problemText({ kind: "network", message: "offline" }, true), null); // old lists stay; the header says so
+});
+
+test("staleText carries the reason under the old lists", async () => {
+  const { staleText } = await import("../mods/gh-prs/format.js");
+  assert.equal(staleText({ stale: true, problem: { kind: "network", message: "HTTP 502" } }), "Couldn't refresh: HTTP 502");
+  assert.equal(staleText({ stale: false, problem: null }), null);
+});
