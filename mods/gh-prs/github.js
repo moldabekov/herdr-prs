@@ -1,0 +1,86 @@
+// The one GraphQL call per refresh, and reading its answer. Pure: no host imports.
+
+export const LIMIT = 30;
+export const MINE_QUERY = "is:pr is:open author:@me archived:false sort:updated-desc";
+
+const FRAGMENT = `fragment pr on PullRequest {
+  number title url isDraft reviewDecision mergeable updatedAt headRefName
+  author { login }
+  repository { nameWithOwner }
+  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+}`;
+
+const REPOSITORY = `repository(owner: $owner, name: $name) {
+    nameWithOwner
+    pullRequests(states: OPEN, first: ${LIMIT}, orderBy: { field: UPDATED_AT, direction: DESC }) {
+      totalCount nodes { ...pr }
+    }
+  }`;
+
+export function buildQuery(withRepo) {
+  const vars = withRepo ? "$mine: String!, $owner: String!, $name: String!" : "$mine: String!";
+  return `query(${vars}) {
+  viewer { login }
+  ${withRepo ? REPOSITORY : ""}
+  mine: search(query: $mine, type: ISSUE, first: ${LIMIT}) { issueCount nodes { ...pr } }
+}
+${FRAGMENT}`;
+}
+
+// -f sends every value as a string; -F would turn a repo named "123" into a number.
+export function ghArgs(repo) {
+  const base = ["api", "graphql", "-f", `query=${buildQuery(Boolean(repo))}`, "-f", `mine=${MINE_QUERY}`];
+  return repo ? [...base, "-f", `owner=${repo.owner}`, "-f", `name=${repo.name}`] : base;
+}
+
+function toRow(node) {
+  return {
+    number: node.number,
+    title: node.title,
+    url: node.url,
+    isDraft: Boolean(node.isDraft),
+    review: node.reviewDecision ?? null,
+    mergeable: node.mergeable ?? "UNKNOWN",
+    ci: node.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state ?? null,
+    updatedAt: node.updatedAt,
+    branch: node.headRefName,
+    author: node.author?.login ?? null,
+    repo: node.repository?.nameWithOwner,
+  };
+}
+
+function section(nodes, total, error) {
+  if (error) return { items: [], total: 0, error };
+  return { items: (nodes ?? []).filter((n) => n && typeof n.number === "number").map(toRow), total: total ?? 0, error: null };
+}
+
+function errorFor(errors, key) {
+  return errors.find((e) => e?.path?.[0] === key)?.message ?? null;
+}
+
+export function parseResponse(stdout) {
+  const body = JSON.parse(stdout);
+  const errors = Array.isArray(body.errors) ? body.errors : [];
+  if (!body.data) throw new Error(errors[0]?.message ?? "GitHub returned no data");
+  const { data } = body;
+  const repoError = errorFor(errors, "repository");
+  const asked = "repository" in data || repoError !== null;
+  const prs = data.repository?.pullRequests;
+  return {
+    repo: asked ? section(prs?.nodes, prs?.totalCount, repoError) : null,
+    mine: section(data.mine?.nodes, data.mine?.issueCount, errorFor(errors, "mine")),
+  };
+}
+
+const TIMEOUT = /time(d)?\s?out/i;
+const AUTH = /auth login|not logged in|authentication|HTTP 401/i;
+
+export function classifyFailure(failure) {
+  if (failure instanceof Error) {
+    return { kind: TIMEOUT.test(failure.message) ? "network" : "missing-gh", message: failure.message };
+  }
+  const stderr = String(failure?.stderr ?? "");
+  const first = stderr.split("\n").map((l) => l.trim()).find(Boolean);
+  if (AUTH.test(stderr)) return { kind: "auth", message: first ?? "Not logged in to GitHub" };
+  return { kind: "network", message: first ?? `gh exited ${failure?.code}` };
+}
