@@ -1,14 +1,16 @@
 // A controllable stand-in for Herdr's host module: one focused folder, a panel
 // that is shown or hidden, and exec answers for git and gh that count calls.
-export const control = { shown: true, cwd: "/w/a", ghOk: true, remotes: {} };
+export const control = { shown: true, space: "s1", cwd: "/w/a", ghOk: true, remotes: {} };
 export const calls = { gh: 0, git: 0 };
+export const commands = [];
 
 export function reset(over = {}) {
-  Object.assign(control, { shown: true, cwd: "/w/a", ghOk: true, remotes: { "/w/a": "git@github.com:o/a.git", "/w/b": "git@github.com:o/b.git" } }, over);
+  commands.length = 0;
+  Object.assign(control, { shown: true, space: "s1", cwd: "/w/a", ghOk: true, remotes: { "/w/a": "git@github.com:o/a.git", "/w/b": "git@github.com:o/b.git" } }, over);
   Object.assign(calls, { gh: 0, git: 0 });
 }
 
-export const spaces = () => [{ id: "s1", active: true, machine: null, folder: control.cwd }];
+export const spaces = () => [{ id: control.space, active: true, machine: null, folder: control.cwd }];
 export const panes = () => [{ pane: "p1", cwd: control.cwd }];
 export const focused = () => ({ space: "s1", tab: "t1", pane: "p1", terminal: "t1", cwd: control.cwd });
 export const layout = () => ({
@@ -18,7 +20,7 @@ export const layout = () => ({
 export const theme = () => new Proxy({}, { get: () => "#000000" });
 export const checking = () => false;
 export const props = () => ({});
-export const run = () => null;
+export const run = (name, args) => { commands.push({ name, args }); return null; };
 
 function prBody(args) {
   const name = args.find((a) => a.startsWith("name="))?.slice(5);
