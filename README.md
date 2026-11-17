@@ -3,6 +3,8 @@
 A **Pull requests** panel for the [Herdr](https://herdr.dev) app. It sits
 beside the Files and Changes panels and has a **PRs** button in the tab bar.
 
+<img src="preview.png" alt="The Pull requests panel beside a terminal, listing a public repo's open PRs" width="294">
+
 It shows three lists:
 
 - **This repo**: the open PRs of the repo your focused terminal is in. It
@@ -47,6 +49,8 @@ button opens it again.
 ## Install
 
 ```sh
+git clone https://github.com/moldabekov/herdr-prs
+cd herdr-prs
 bash scripts/install.sh
 ```
 
@@ -131,4 +135,5 @@ npm run coverage    # with an 80% line threshold
 - **The drawing** (`panel-view.js`, `main.js`) is checked with
   `herdr-app check` and in the running app with `herdr-app shot`.
 
-The design and the plan are in `docs/superpowers/`.
+The design and the plan are in `docs/superpowers/`. `RECIPE.md` is the
+brief to build this mod from scratch, in the format herdr.dev uses.
