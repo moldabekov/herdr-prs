@@ -55,3 +55,24 @@ export function parseCollapsed(text) {
 export function toggleCollapsed(collapsed, kind) {
   return { ...collapsed, [kind]: !collapsed[kind] };
 }
+
+// Two looks at a folder point at the same thing: the same GitHub repo, or the
+// same reason there is none.
+export function sameSource(a, b) {
+  if (!a || !b) return false;
+  if (a.repo || b.repo) return Boolean(a.repo && b.repo && a.repo.owner === b.repo.owner && a.repo.name === b.repo.name);
+  return a.note === b.note;
+}
+
+// A folder change only costs a GitHub call when it lands in another repo, or
+// when the interval is up anyway. The refresh button forces one.
+export function shouldFetch({ source, state, now, force }) {
+  if (force || state.triedAt === null || now - state.triedAt >= INTERVAL_MS) return true;
+  return !sameSource(source, state.source);
+}
+
+export function latest(a, b) {
+  if (a === null || a === undefined) return b ?? null;
+  if (b === null || b === undefined) return a;
+  return Math.max(a, b);
+}

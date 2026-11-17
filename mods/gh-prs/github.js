@@ -88,6 +88,11 @@ export function outcomeFromExec(result) {
   }
 }
 
+// Only GitHub's own PR pages go to the browser.
+export function isGitHubUrl(url) {
+  return typeof url === "string" && /^https:\/\/github\.com\/[^\s]+$/.test(url);
+}
+
 const TIMEOUT = /time(d)?\s?out/i;
 const AUTH = /auth login|not logged in|authentication|HTTP 401/i;
 

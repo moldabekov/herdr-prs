@@ -3,8 +3,8 @@
 import { spaces, panes, focused, exec, layout, theme, checking } from "herdr";
 import { isPanelShown } from "./layout-state.js";
 import { resolveRepo } from "./repo.js";
-import { ghArgs, outcomeFromExec, classifyFailure } from "./github.js";
-import { initialState, applyFetch, needsRefresh, toSections, parseCollapsed, toggleCollapsed } from "./state.js";
+import { ghArgs, outcomeFromExec, classifyFailure, isGitHubUrl } from "./github.js";
+import { initialState, applyFetch, needsRefresh, shouldFetch, latest, toSections, parseCollapsed, toggleCollapsed } from "./state.js";
 import { staleText } from "./format.js";
 import { renderPanel } from "./panel-view.js";
 
@@ -40,15 +40,17 @@ export class PanelView {
     this.inFlight = false;
     this.context = undefined;
     this.note = null;
+    this.errorAt = null;
     this.collapsed = readCollapsed();
     cx.timer.every(TICK_MS, (cx) => { if (this.due(Date.now())) this.refresh(cx); });
   }
 
   due(now) {
-    return needsRefresh({ shown: isPanelShown(layout()), inFlight: this.inFlight, triedAt: this.state.triedAt, now, contextChanged: key() !== this.context });
+    const triedAt = latest(this.state.triedAt, this.errorAt);
+    return needsRefresh({ shown: isPanelShown(layout()), inFlight: this.inFlight, triedAt, now, contextChanged: key() !== this.context });
   }
 
-  refresh(cx) {
+  refresh(cx, force = false) {
     if (this.inFlight || checking()) return;
     const context = key(), { cwd, on } = location();
     this.inFlight = true;
@@ -56,10 +58,16 @@ export class PanelView {
     cx.spawn(async (cx) => {
       try {
         const resolved = await resolveRepo(cwd, on, exec);
+        if (!shouldFetch({ source: resolved, state: this.state, now: Date.now(), force })) return;
         const outcome = await fetchPrs(resolved.repo);
         // Focus moved to another folder meanwhile: drop it; render asks again.
         if (key() !== context) return;
         this.state = applyFetch(this.state, { ...outcome, source: resolved }, Date.now());
+      } catch (error) {
+        // Not a GitHub answer: a bug. Say so, and pace the next try like a failure.
+        this.note = `Couldn't update pull requests: ${error?.message ?? error}`;
+        this.errorAt = Date.now();
+        console.log(`gh-prs: refresh failed: ${error?.stack ?? error}`);
       } finally {
         this.inFlight = false;
         cx.notify();
@@ -68,6 +76,11 @@ export class PanelView {
   }
 
   open(url, cx) {
+    if (!isGitHubUrl(url)) {
+      this.note = `Not a GitHub link: ${String(url).slice(0, 80)}`;
+      cx.notify();
+      return;
+    }
     this.note = null;
     cx.spawn(async (cx) => {
       try {
@@ -94,7 +107,7 @@ export class PanelView {
       now, at, stale, problem, inFlight: this.inFlight, note: this.note ?? staleText(this.state),
       sections: toSections(data, source?.repo ?? null, source?.note ?? null, this.collapsed),
     }, {
-      onRefresh: (cx) => { this.refresh(cx); cx.notify(); },
+      onRefresh: (cx) => { this.refresh(cx, true); cx.notify(); },
       onOpen: (url, cx) => this.open(url, cx),
       onToggle: (kind, cx) => this.toggle(kind, cx),
     });

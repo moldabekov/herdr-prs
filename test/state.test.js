@@ -126,3 +126,30 @@ test("toggleCollapsed returns a new object", () => {
   assert.deepEqual(toggleCollapsed(before, "mine"), { repo: false, mine: true });
   assert.deepEqual(before, { repo: false, mine: false });
 });
+
+const { sameSource, shouldFetch, latest } = await import("../mods/gh-prs/state.js");
+
+test("sameSource compares the repo, or the note when there is none", () => {
+  assert.equal(sameSource({ repo: { owner: "o", name: "a" }, note: null }, { repo: { owner: "o", name: "a" }, note: null }), true);
+  assert.equal(sameSource({ repo: { owner: "o", name: "a" }, note: null }, { repo: { owner: "o", name: "b" }, note: null }), false);
+  assert.equal(sameSource({ repo: null, note: "No folder" }, { repo: null, note: "No folder" }), true);
+  assert.equal(sameSource({ repo: null, note: "No folder" }, { repo: null, note: "Not a git repository" }), false);
+  assert.equal(sameSource({ repo: null, note: "x" }, null), false);
+});
+
+test("shouldFetch skips a same-repo folder change inside the interval", () => {
+  const source = { repo: { owner: "o", name: "a" }, note: null };
+  const state = { ...initialState(), source, triedAt: 1000 };
+  assert.equal(shouldFetch({ source, state, now: 2000, force: false }), false);
+  assert.equal(shouldFetch({ source, state, now: 2000, force: true }), true);
+  assert.equal(shouldFetch({ source, state, now: 61000, force: false }), true);
+  assert.equal(shouldFetch({ source: { repo: { owner: "o", name: "b" }, note: null }, state, now: 2000, force: false }), true);
+  assert.equal(shouldFetch({ source, state: initialState(), now: 2000, force: false }), true);
+});
+
+test("latest picks the later time and treats null as never", () => {
+  assert.equal(latest(null, null), null);
+  assert.equal(latest(5, null), 5);
+  assert.equal(latest(null, 7), 7);
+  assert.equal(latest(9, 7), 9);
+});

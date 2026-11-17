@@ -65,7 +65,7 @@ test("without a version, cloned_from keeps what it had", () => {
 
 test("throws a clear error when an anchor is missing", () => {
   const noStack = { ...main, children: main.children.map((c) => (c.id === "work" ? { ...c, children: [] } : c)) };
-  assert.throws(() => patchLayout(noStack), /main\.json has no node "(panel-body|tabs)": Herdr changed its main layout; update scripts\/make-layout\.mjs/);
+  assert.throws(() => patchLayout(noStack), /main\.json has no node "(panel|panel-body|tabs)": Herdr changed its main layout; update scripts\/make-layout\.mjs/);
   const noTabs = JSON.parse(JSON.stringify(main).replace('"id":"tabs"', '"id":"tabz"'));
   assert.throws(() => patchLayout(noTabs), /no node "tabs"/);
 });
@@ -99,7 +99,7 @@ test("CLI exits 1 with the message on a broken main", () => {
   writeFileSync(bad, JSON.stringify({ id: "root", type: "row", children: [] }));
   const run = spawnSync(process.execPath, [SCRIPT, bad, join(dir, "out.json")], { encoding: "utf8" });
   assert.equal(run.status, 1);
-  assert.match(run.stderr, /no node "panel-body"/);
+  assert.match(run.stderr, /no node "panel"/);
   assert.equal(existsSync(join(dir, "out.json")), false);
 });
 
@@ -107,4 +107,15 @@ test("CLI exits 1 with usage when arguments are missing", () => {
   const run = spawnSync(process.execPath, [SCRIPT], { encoding: "utf8" });
   assert.equal(run.status, 1);
   assert.match(run.stderr, /usage: node scripts\/make-layout\.mjs <main\.json> <out\.json> \[--version <v>\]/);
+});
+
+// Deferred minor: every node the mod relies on is checked.
+test("throws when the panel column is missing", () => {
+  const noPanel = JSON.parse(JSON.stringify(main).replace('"id":"panel"', '"id":"panelz"'));
+  assert.throws(() => patchLayout(noPanel), /no node "panel"/);
+});
+
+test("throws when panel-body is not a stack", () => {
+  const notStack = JSON.parse(JSON.stringify(main).replace('"id":"panel-body","type":"stack"', '"id":"panel-body","type":"column"'));
+  assert.throws(() => patchLayout(notStack), /"panel-body" is not a stack/);
 });

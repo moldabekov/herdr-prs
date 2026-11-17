@@ -1,13 +1,13 @@
 // A controllable stand-in for Herdr's host module: one focused folder, a panel
 // that is shown or hidden, and exec answers for git and gh that count calls.
 export const control = { shown: true, space: "s1", cwd: "/w/a", ghOk: true, remotes: {} };
-export const calls = { gh: 0, git: 0 };
+export const calls = { gh: 0, git: 0, open: 0 };
 export const commands = [];
 
 export function reset(over = {}) {
   commands.length = 0;
-  Object.assign(control, { shown: true, space: "s1", cwd: "/w/a", ghOk: true, remotes: { "/w/a": "git@github.com:o/a.git", "/w/b": "git@github.com:o/b.git" } }, over);
-  Object.assign(calls, { gh: 0, git: 0 });
+  Object.assign(control, { shown: true, space: "s1", cwd: "/w/a", ghOk: true, remotes: { "/w/a": "git@github.com:o/a.git", "/w/b": "git@github.com:o/b.git" }, roots: { "/w/a/sub": "/w/a" } }, over);
+  Object.assign(calls, { gh: 0, git: 0, open: 0 });
 }
 
 export const spaces = () => [{ id: control.space, active: true, machine: null, folder: control.cwd }];
@@ -32,7 +32,7 @@ function prBody(args) {
 export async function exec(cmd, args, opts = {}) {
   if (cmd === "git") {
     calls.git += 1;
-    if (args[0] === "rev-parse") return { code: 0, stdout: `${opts.cwd}\n`, stderr: "" };
+    if (args[0] === "rev-parse") return { code: 0, stdout: `${control.roots?.[opts.cwd] ?? opts.cwd}\n`, stderr: "" };
     const url = args[2] === "origin" ? control.remotes[opts.cwd] : undefined;
     return url ? { code: 0, stdout: `${url}\n`, stderr: "" } : { code: 2, stdout: "", stderr: "error: No such remote" };
   }
@@ -40,5 +40,6 @@ export async function exec(cmd, args, opts = {}) {
     calls.gh += 1;
     return control.ghOk ? { code: 0, stdout: prBody(args), stderr: "" } : { code: 1, stdout: "", stderr: "dial tcp: lookup api.github.com: no such host" };
   }
+  if (cmd === "open") calls.open += 1;
   return { code: 0, stdout: "", stderr: "" };
 }

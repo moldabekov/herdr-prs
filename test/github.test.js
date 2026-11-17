@@ -173,3 +173,13 @@ test("parseResponse keeps a section whose data came back next to a nested error"
   assert.deepEqual(out.mine.items.map((p) => p.number), [1, 2, 3]);
   assert.equal(out.mine.total, 4);
 });
+
+test("isGitHubUrl accepts only https://github.com links", async () => {
+  const { isGitHubUrl } = await import("../mods/gh-prs/github.js");
+  assert.equal(isGitHubUrl("https://github.com/o/r/pull/1"), true);
+  assert.equal(isGitHubUrl("http://github.com/o/r/pull/1"), false);
+  assert.equal(isGitHubUrl("https://github.com.evil.io/o/r/pull/1"), false);
+  assert.equal(isGitHubUrl("file:///etc/passwd"), false);
+  assert.equal(isGitHubUrl("https://github.com/o/r pull"), false);
+  assert.equal(isGitHubUrl(undefined), false);
+});

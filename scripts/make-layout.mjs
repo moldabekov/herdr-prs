@@ -10,6 +10,7 @@ import { pathToFileURL } from "node:url";
 
 export const BUTTON_WIDTH_PX = 68;
 
+const PANEL = "panel";
 const STACK = "panel-body";
 const TABS = "tabs";
 const ROW = "tabs-row";
@@ -19,12 +20,19 @@ const BUTTON = {
   content: { mod: "gh-prs", props: { button: true } },
 };
 
-function contains(node, id) {
-  return node?.id === id || (node?.children ?? []).some((c) => contains(c, id));
+function find(node, id) {
+  if (node?.id === id) return node;
+  for (const child of node?.children ?? []) {
+    const found = find(child, id);
+    if (found) return found;
+  }
+  return null;
 }
 
 function requireNode(tree, id) {
-  if (!contains(tree, id)) throw new Error(`main.json has no node "${id}": Herdr changed its main layout; update scripts/make-layout.mjs`);
+  const node = find(tree, id);
+  if (!node) throw new Error(`main.json has no node "${id}": Herdr changed its main layout; update scripts/make-layout.mjs`);
+  return node;
 }
 
 function wrapTabs(tabs) {
@@ -45,7 +53,8 @@ function patchNode(node) {
 }
 
 export function patchLayout(main, meta = {}) {
-  requireNode(main, STACK);
+  requireNode(main, PANEL);
+  if (requireNode(main, STACK).type !== "stack") throw new Error(`main.json's "${STACK}" is not a stack: Herdr changed its main layout; update scripts/make-layout.mjs`);
   requireNode(main, TABS);
   const base = meta.clonedFrom ?? main.cloned_from ?? { name: "main" };
   const clonedFrom = meta.version ? { ...base, version: meta.version } : { ...base };
